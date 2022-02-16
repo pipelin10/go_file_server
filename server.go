@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"math/rand"
 	"net"
 	"net/http"
@@ -11,6 +12,8 @@ import (
 	"strings"
 	"time"
 )
+
+const bufferSize = 1024
 
 func helloHandler(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/hello" {
@@ -43,21 +46,59 @@ func handleConnection(c net.Conn) {
 	fmt.Printf("Serving %s\n", c.RemoteAddr().String())
 	for {
 		netData, err := bufio.NewReader(c).ReadString('\n')
-		fmt.Println(netData)
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
-
-		temp := strings.TrimSpace(string(netData))
-		fmt.Println(temp)
+		splitMessage := strings.Split(string(netData), " ")
+		temp := strings.TrimSpace(splitMessage[0])
+		fmt.Println(splitMessage)
 		if temp == "STOP" {
 			fmt.Printf("Closing connection with %s\n", c.RemoteAddr().String())
 			break
+		} else if temp == "get" {
+			fileName := ".\\files_to_send\\" + splitMessage[1]
+			currentByte := 0
+
+			fileBuffer := make([]byte, bufferSize)
+
+			file, err := os.Open(strings.TrimSpace(fileName))
+			fmt.Println("File:", file)
+			if err != nil {
+				fmt.Fprintf(c, "No se encuentra un archivo en la ruta")
+				continue
+			}
+			defer file.Close()
+
+			for {
+				n, err := file.ReadAt(fileBuffer, int64(currentByte))
+				currentByte += bufferSize
+				fmt.Println(fileBuffer)
+				c.Write(fileBuffer[:n])
+				fmt.Println("Sent", n, "bytes")
+				if err == io.EOF {
+					break
+				}
+			}
+			fmt.Println("Closing File")
+			file.Close()
+			netData, err = bufio.NewReader(c).ReadString('\n')
+			fmt.Println("Response from server:", netData)
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+			netData, err = bufio.NewReader(c).ReadString('\n')
+			fmt.Println("Response from server:", netData)
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+		} else {
+			result := strconv.Itoa(rand.Intn(100-1)+1) + "\n"
+			c.Write([]byte(string(result)))
 		}
 
-		result := strconv.Itoa(rand.Intn(100-1)+1) + "\n"
-		c.Write([]byte(string(result)))
 	}
 	c.Close()
 }

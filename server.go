@@ -2,8 +2,10 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"io"
+	"log"
 	"math/rand"
 	"net"
 	"net/http"
@@ -42,6 +44,83 @@ func formHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Address = %s\n", address)
 }
 
+func send_data_to_client(fileName string, conn net.Conn) {
+	currentByte := 0
+
+	fileBuffer := make([]byte, bufferSize)
+
+	file, err := os.Open(strings.TrimSpace(fileName))
+	fmt.Println("File:", file)
+	if err != nil {
+		fmt.Fprintf(conn, "No se encuentra un archivo en la ruta")
+		return
+	}
+	defer file.Close()
+
+	for {
+		n, err := file.ReadAt(fileBuffer, int64(currentByte))
+		currentByte += bufferSize
+		fmt.Println(fileBuffer)
+		conn.Write(fileBuffer[:n])
+		fmt.Println("Sent", n, "bytes")
+		if err == io.EOF {
+			break
+		}
+	}
+	fmt.Println("Closing File")
+	file.Close()
+}
+
+func get_data_from_client(fileName string, conn net.Conn) {
+	const bufferSize = 1024
+	currentByte := 0
+
+	fileBuffer := make([]byte, bufferSize)
+
+	file, err := os.Create(strings.TrimSpace(fileName))
+	if err != nil {
+		fmt.Println("Error creating file")
+		log.Fatal(err)
+	}
+	defer file.Close()
+	// defer conn.Close()
+
+	for {
+		fmt.Println("Inside reading")
+		fmt.Println("Before reading")
+		n, err := conn.Read(fileBuffer)
+		fileBufferString := string(fileBuffer[:])
+		// fmt.Println("File Buffer String", fileBufferString)
+		if err == io.EOF || err != nil {
+			fmt.Println("Algarete!!!")
+			break
+		}
+		if fileBufferString == "No se encuentra un archivo en la ruta" {
+			fmt.Println("Error al cargar el archivo")
+			return
+		}
+		fmt.Println("Bytes read", n)
+		fmt.Println("File Buffer", fileBuffer)
+		bufferFile := bytes.NewBuffer(fileBuffer)
+		fmt.Println("File Buffer Lenght: ", bufferFile.Len())
+		// cleanedFileBuffer := bytes.Trim(fileBuffer, "\x00")
+
+		fmt.Println("Writing in File")
+		_, err = file.WriteAt(fileBuffer[:n], int64(currentByte))
+
+		fmt.Println("Adding buffer")
+		currentByte += bufferSize
+
+		if err == io.EOF || n != bufferSize {
+			fmt.Println("Algarete!!!")
+			break
+		}
+	}
+	// c.Write([]byte("get " + fileName + "\n"))
+	fmt.Println("Out reading")
+	file.Close()
+}
+
 func handleConnection(c net.Conn) {
 	fmt.Printf("Serving %s\n", c.RemoteAddr().String())
 	for {
@@ -57,48 +136,15 @@ func handleConnection(c net.Conn) {
 			fmt.Printf("Closing connection with %s\n", c.RemoteAddr().String())
 			break
 		} else if temp == "get" {
-			fileName := ".\\files_to_send\\" + splitMessage[1]
-			currentByte := 0
-
-			fileBuffer := make([]byte, bufferSize)
-
-			file, err := os.Open(strings.TrimSpace(fileName))
-			fmt.Println("File:", file)
-			if err != nil {
-				fmt.Fprintf(c, "No se encuentra un archivo en la ruta")
-				continue
-			}
-			defer file.Close()
-
-			for {
-				n, err := file.ReadAt(fileBuffer, int64(currentByte))
-				currentByte += bufferSize
-				fmt.Println(fileBuffer)
-				c.Write(fileBuffer[:n])
-				fmt.Println("Sent", n, "bytes")
-				if err == io.EOF {
-					break
-				}
-			}
-			fmt.Println("Closing File")
-			file.Close()
-			netData, err = bufio.NewReader(c).ReadString('\n')
-			fmt.Println("Response from server:", netData)
-			if err != nil {
-				fmt.Println(err)
-				return
-			}
-			netData, err = bufio.NewReader(c).ReadString('\n')
-			fmt.Println("Response from server:", netData)
-			if err != nil {
-				fmt.Println(err)
-				return
-			}
+			fileName := ".\\files_to_send_server\\" + splitMessage[1]
+			send_data_to_client(fileName, c)
+		} else if temp == "send" {
+			fileName := ".\\files_recieved_server\\" + splitMessage[1]
+			get_data_from_client(fileName, c)
 		} else {
 			result := strconv.Itoa(rand.Intn(100-1)+1) + "\n"
 			c.Write([]byte(string(result)))
 		}
-
 	}
 	c.Close()
 }

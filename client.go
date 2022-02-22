@@ -11,13 +11,15 @@ import (
 	"strings"
 )
 
-func get_data_from_server(fileName string, conn net.Conn) {
+var channelsSubscribed []string
+
+func get_data_from_server(filePath string, conn net.Conn) {
 	const bufferSize = 1024
 	currentByte := 0
 
 	fileBuffer := make([]byte, bufferSize)
 
-	file, err := os.Create(strings.TrimSpace(fileName))
+	file, err := os.Create(strings.TrimSpace(filePath))
 	if err != nil {
 		fmt.Println("Error creating file")
 		log.Fatal(err)
@@ -56,17 +58,17 @@ func get_data_from_server(fileName string, conn net.Conn) {
 			break
 		}
 	}
-	// c.Write([]byte("get " + fileName + "\n"))
+	// c.Write([]byte("get " + filePath + "\n"))
 	fmt.Println("Out reading")
 	file.Close()
 }
 
-func send_data_to_server(fileName string, conn net.Conn) {
+func send_data_to_server(filePath string, conn net.Conn) {
 	const bufferSize = 1024
 	currentByte := 0
 	fileBuffer := make([]byte, bufferSize)
 
-	file, err := os.Open(strings.TrimSpace(fileName))
+	file, err := os.Open(strings.TrimSpace(filePath))
 	fmt.Println("File:", file)
 	if err != nil {
 		fmt.Fprintf(conn, "No se encuentra un archivo en la ruta")
@@ -88,6 +90,36 @@ func send_data_to_server(fileName string, conn net.Conn) {
 	file.Close()
 }
 
+func exist_channel(channel string, arrayChannels []string) bool {
+	for _, channelArray := range arrayChannels {
+		if channelArray == channel {
+			return true
+		}
+	}
+	return false
+}
+
+func handleDataRecieved(conn net.Conn) {
+	fmt.Printf("Listen to data from %s\n", conn.RemoteAddr().String())
+	for {
+		netData, err := bufio.NewReader(conn).ReadString('\n')
+		if err != nil {
+			fmt.Print(err)
+			return
+		}
+		fmt.Print("Recieving Data\n")
+		fmt.Print(netData)
+		splitMessage := strings.Split(string(netData), " ")
+		command := strings.TrimSpace(splitMessage[0])
+		if command == "send" {
+			fileName := splitMessage[1]
+			filePath := ".\\files_recieved_client" + conn.LocalAddr().String() + "\\" + fileName
+			get_data_from_server(filePath, conn)
+		}
+		fmt.Print("\n")
+	}
+}
+
 func main() {
 	arguments := os.Args
 	if len(arguments) == 1 {
@@ -101,31 +133,41 @@ func main() {
 		fmt.Println(err)
 		return
 	}
+	defer c.Close()
+
+	go handleDataRecieved(c)
 
 	for {
 		reader := bufio.NewReader(os.Stdin)
-		fmt.Print(">> ")
 		text, _ := reader.ReadString('\n')
-		fmt.Fprintf(c, text+"\n")
 		text_split := strings.Split(strings.TrimSpace(string(text)), " ")
-		if strings.TrimSpace(string(text_split[0])) == "st" {
+		command := strings.TrimSpace(string(text_split[0]))
+		if command == "st" {
+			fmt.Fprintf(c, text+"\n")
 			fmt.Println("TCP Cliente exting")
 			c.Close()
 			return
-		} else if strings.TrimSpace(string(text_split[0])) == "get" {
-			fileName := ".\\files_recieved_client\\" + text_split[1]
-			get_data_from_server(fileName, c)
-		} else if strings.TrimSpace(string(text_split[0])) == "send" {
-			fileName := ".\\files_to_send_client\\" + text_split[1]
-			send_data_to_server(fileName, c)
-		} else {
-			message, err := bufio.NewReader(c).ReadString('\n')
-			if err != nil {
-				fmt.Println(err)
-				fmt.Println("Close Connection")
-				return
+		} else if command == "get" {
+			fmt.Fprintf(c, text+"\n")
+			filePath := ".\\files_recieved_client\\" + text_split[1]
+			get_data_from_server(filePath, c)
+		} else if command == "send" {
+			fmt.Fprintf(c, text+"\n")
+			filePath := ".\\files_to_send_client\\" + text_split[1]
+			send_data_to_server(filePath, c)
+		} else if command == "subscribe" {
+			channel := text_split[1]
+			fmt.Printf(channel)
+			if !exist_channel(channel, channelsSubscribed) {
+				fmt.Fprintf(c, text+"\n")
+				channelsSubscribed = append(channelsSubscribed, channel)
+				fmt.Print(channelsSubscribed)
+				fmt.Printf("\n")
+			} else {
+				fmt.Printf("Already subscribed to channel %s\n", channel)
 			}
-			fmt.Print("->:" + message)
+		} else {
+			fmt.Fprintf(c, text)
 		}
 	}
 }

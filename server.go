@@ -10,12 +10,13 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 )
 
 const bufferSize = 1024
+
+var channels map[string][]net.Conn
 
 func helloHandler(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/hello" {
@@ -44,12 +45,12 @@ func formHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Address = %s\n", address)
 }
 
-func send_data_to_client(fileName string, conn net.Conn) {
+func send_data_to_client(filePath string, conn net.Conn) {
 	currentByte := 0
 
 	fileBuffer := make([]byte, bufferSize)
 
-	file, err := os.Open(strings.TrimSpace(fileName))
+	file, err := os.Open(strings.TrimSpace(filePath))
 	fmt.Println("File:", file)
 	if err != nil {
 		fmt.Fprintf(conn, "No se encuentra un archivo en la ruta")
@@ -71,13 +72,13 @@ func send_data_to_client(fileName string, conn net.Conn) {
 	file.Close()
 }
 
-func get_data_from_client(fileName string, conn net.Conn) {
+func get_data_from_client(filePath string, conn net.Conn) {
 	const bufferSize = 1024
 	currentByte := 0
 
 	fileBuffer := make([]byte, bufferSize)
 
-	file, err := os.Create(strings.TrimSpace(fileName))
+	file, err := os.Create(strings.TrimSpace(filePath))
 	if err != nil {
 		fmt.Println("Error creating file")
 		log.Fatal(err)
@@ -116,7 +117,7 @@ func get_data_from_client(fileName string, conn net.Conn) {
 			break
 		}
 	}
-	// c.Write([]byte("get " + fileName + "\n"))
+	// c.Write([]byte("get " + filePath + "\n"))
 	fmt.Println("Out reading")
 	file.Close()
 }
@@ -130,26 +131,47 @@ func handleConnection(c net.Conn) {
 			return
 		}
 		splitMessage := strings.Split(string(netData), " ")
-		temp := strings.TrimSpace(splitMessage[0])
+		command := strings.TrimSpace(splitMessage[0])
 		fmt.Println(splitMessage)
-		if temp == "STOP" {
+		if command == "STOP" {
 			fmt.Printf("Closing connection with %s\n", c.RemoteAddr().String())
 			break
-		} else if temp == "get" {
-			fileName := ".\\files_to_send_server\\" + splitMessage[1]
-			send_data_to_client(fileName, c)
-		} else if temp == "send" {
-			fileName := ".\\files_recieved_server\\" + splitMessage[1]
-			get_data_from_client(fileName, c)
+		} else if command == "get" {
+			filePath := ".\\files_to_send_server\\" + splitMessage[1]
+			send_data_to_client(filePath, c)
+		} else if command == "send" {
+			fileName := splitMessage[1]
+			filePath := ".\\files_recieved_server\\" + fileName
+			channel := splitMessage[2]
+			get_data_from_client(filePath, c)
+			fmt.Printf(channel)
+			ipHostClientSending := c.RemoteAddr().String()
+			for _, conn := range channels[channel] {
+				ipHostCienteReceiving := conn.RemoteAddr().String()
+				if ipHostClientSending != ipHostCienteReceiving {
+					fmt.Fprintf(conn, "send %s\n", fileName)
+					send_data_to_client(filePath, conn)
+				}
+			}
+		} else if command == "subscribe" {
+			channel := splitMessage[1]
+			channels[channel] = append(channels[channel], c)
+			for chanMap, connArray := range channels {
+				fmt.Print(chanMap)
+				for conn := range connArray {
+					fmt.Print(" ", connArray[conn].RemoteAddr().String())
+				}
+				fmt.Printf("\n")
+			}
 		} else {
-			result := strconv.Itoa(rand.Intn(100-1)+1) + "\n"
-			c.Write([]byte(string(result)))
+			c.Write([]byte(string("Please specify a command")))
 		}
 	}
 	c.Close()
 }
 
 func main() {
+	channels = make(map[string][]net.Conn)
 	// fileServer := http.FileServer(http.Dir("./static"))
 	// http.Handle("/", fileServer)
 	// http.HandleFunc("/hello", helloHandler)

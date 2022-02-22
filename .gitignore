@@ -13,8 +13,8 @@
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
-files_to_send_client/*
-files_to_send_server/*
-files_recieved_client/*
-files_recieved_server/*
+files_to_send_client*/*
+files_to_send_server*/*
+files_recieved_client*/*
+files_recieved_server*/*
 !files_to_send/explicacion.md

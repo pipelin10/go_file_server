@@ -13,7 +13,7 @@ import (
 
 var channelsSubscribed []string
 
-func get_data_from_server(filePath string, conn net.Conn) {
+func get_data_from_server(filePath string, dirPath string, conn net.Conn) {
 	const bufferSize = 1024
 	currentByte := 0
 
@@ -22,7 +22,16 @@ func get_data_from_server(filePath string, conn net.Conn) {
 	file, err := os.Create(strings.TrimSpace(filePath))
 	if err != nil {
 		fmt.Println("Error creating file")
-		log.Fatal(err)
+		if os.IsNotExist(err) {
+			err := os.Mkdir(strings.TrimSpace(dirPath), os.ModePerm)
+			if err != nil {
+				log.Fatal(err)
+			}
+			file, _ = os.Create(strings.TrimSpace(filePath))
+			fmt.Println("Created directory", dirPath)
+		} else {
+			log.Fatal(err)
+		}
 	}
 	defer file.Close()
 	// defer conn.Close()
@@ -113,8 +122,12 @@ func handleDataRecieved(conn net.Conn) {
 		command := strings.TrimSpace(splitMessage[0])
 		if command == "send" {
 			fileName := splitMessage[1]
-			filePath := ".\\files_recieved_client" + conn.LocalAddr().String() + "\\" + fileName
-			get_data_from_server(filePath, conn)
+			localAddress := conn.LocalAddr().String()
+			localAddress = strings.Replace(localAddress, ".", "_", -1)
+			localAddress = strings.Replace(localAddress, ":", "_", -1)
+			filePath := ".\\files_recieved_client" + localAddress + "\\" + fileName
+			dirPath := ".\\files_recieved_client" + localAddress + "\\"
+			get_data_from_server(filePath, dirPath, conn)
 		}
 		fmt.Print("\n")
 	}
@@ -150,7 +163,8 @@ func main() {
 		} else if command == "get" {
 			fmt.Fprintf(c, text+"\n")
 			filePath := ".\\files_recieved_client\\" + text_split[1]
-			get_data_from_server(filePath, c)
+			dirPath := ".\\files_recieved_client\\"
+			get_data_from_server(filePath, dirPath, c)
 		} else if command == "send" {
 			fmt.Fprintf(c, text+"\n")
 			filePath := ".\\files_to_send_client\\" + text_split[1]

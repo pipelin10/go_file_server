@@ -124,6 +124,7 @@ func get_data_from_client(filePath string, conn net.Conn) {
 
 func handleConnection(c net.Conn) {
 	fmt.Printf("Serving %s\n", c.RemoteAddr().String())
+	defer c.Close()
 	for {
 		netData, err := bufio.NewReader(c).ReadString('\n')
 		if err != nil {
@@ -164,7 +165,7 @@ func handleConnection(c net.Conn) {
 				fmt.Printf("\n")
 			}
 		} else {
-			c.Write([]byte(string("Please specify a command")))
+			fmt.Fprintf(c, "Please specify a command\n")
 		}
 	}
 	c.Close()

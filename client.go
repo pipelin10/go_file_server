@@ -113,8 +113,7 @@ func handleDataRecieved(conn net.Conn) {
 	for {
 		netData, err := bufio.NewReader(conn).ReadString('\n')
 		if err != nil {
-			fmt.Print(err)
-			return
+			log.Fatal(err)
 		}
 		fmt.Print("Recieving Data\n")
 		fmt.Print(netData)
@@ -133,7 +132,7 @@ func handleDataRecieved(conn net.Conn) {
 	}
 }
 
-func main() {
+func run_client() {
 	arguments := os.Args
 	if len(arguments) == 1 {
 		fmt.Println("Please provide a host:port")

@@ -14,19 +14,12 @@ type TcpConfig struct {
 	MaxOpenConn int
 }
 
-//Struct that provides a tcp connection interface
-type TcpConn struct {
-	Id   string
-	Pool *TcpConnPool
-	Conn net.Conn
-}
-
 //Struct that contatins all data related to the tcp pool
 type TcpConnPool struct {
 	Host        string
 	Port        int
 	Mu          sync.Mutex
-	Connections []*TcpConn
+	Connections []*net.Conn
 	NumOpen     int
 	MaxOpenConn int
 }
@@ -55,7 +48,7 @@ func CreateTcpPoolConn(config *TcpConfig) (*TcpConnPool, error) {
 		Port:        config.Port,
 		Host:        config.Host,
 		MaxOpenConn: config.MaxOpenConn,
-		Connections: make([]*TcpConn, 0),
+		Connections: make([]*net.Conn, 0),
 	}
 
 	return pool, nil

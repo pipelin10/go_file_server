@@ -9,14 +9,14 @@ import (
 	"strings"
 )
 
-func sendDataToClient(filePath string, conn net.Conn, bufferSize uint32) {
+func sendDataToClient(filePath string, clientConnection *net.Conn, bufferSize uint32) {
 	var currentByte uint32 = 0
 
 	fileBuffer := make([]byte, bufferSize)
 
 	file, err := os.Open(strings.TrimSpace(filePath))
 	if err != nil {
-		fmt.Fprintf(conn, "No se encuentra un archivo en la ruta")
+		fmt.Fprintf((*clientConnection), "No se encuentra un archivo en la ruta")
 		return
 	}
 	defer file.Close()
@@ -25,7 +25,7 @@ func sendDataToClient(filePath string, conn net.Conn, bufferSize uint32) {
 		n, err := file.ReadAt(fileBuffer, int64(currentByte))
 		currentByte += bufferSize
 		fmt.Println(fileBuffer)
-		conn.Write(fileBuffer[:n])
+		(*clientConnection).Write(fileBuffer[:n])
 		if err == io.EOF {
 			break
 		}
@@ -33,7 +33,7 @@ func sendDataToClient(filePath string, conn net.Conn, bufferSize uint32) {
 	file.Close()
 }
 
-func getDataFromClient(filePath string, conn net.Conn, bufferSize uint32) {
+func getDataFromClient(filePath string, clientConnection *net.Conn, bufferSize uint32) {
 	var currentByte uint32 = 0
 
 	fileBuffer := make([]byte, bufferSize)
@@ -46,7 +46,7 @@ func getDataFromClient(filePath string, conn net.Conn, bufferSize uint32) {
 	defer file.Close()
 
 	for {
-		n, err := conn.Read(fileBuffer)
+		n, err := (*clientConnection).Read(fileBuffer)
 		fileBufferString := string(fileBuffer[:])
 
 		if err == io.EOF || err != nil {

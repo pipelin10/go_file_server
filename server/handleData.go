@@ -25,11 +25,11 @@ func sendDataToClient(filePath string, clientConnection *net.Conn, bufferSize ui
 
 	for {
 		//We read from the file
-		n, err := file.ReadAt(fileBuffer, int64(currentByte))
+		numberBytesRead, err := file.ReadAt(fileBuffer, int64(currentByte))
 
 		currentByte += bufferSize //We move the current byte
 
-		(*clientConnection).Write(fileBuffer[:n]) //We send to the client the package read
+		(*clientConnection).Write(fileBuffer[:numberBytesRead]) //We send to the client the package read
 		if err == io.EOF {
 			fmt.Fprintf((*clientConnection), "Error sending file\n")
 			break
@@ -65,7 +65,7 @@ func getDataFromClient(filePath string, dirPath string, clientConnection *net.Co
 
 	for {
 		//We read a package of size equals to bufferSize
-		n, err := (*clientConnection).Read(fileBuffer)
+		numberBytesRead, err := (*clientConnection).Read(fileBuffer)
 		fileBufferString := string(fileBuffer[:])
 
 		//If a error arise during buffer read then we break
@@ -76,13 +76,14 @@ func getDataFromClient(filePath string, dirPath string, clientConnection *net.Co
 			break
 		}
 
+		//If the file doesn't exist we arise an error
 		if fileBufferString == "No se encuentra un archivo en la ruta" {
 			fmt.Println("Error al cargar el archivo")
 			return
 		}
 
-		//We write
-		_, err = file.WriteAt(fileBuffer[:n], int64(currentByte))
+		//We write in the file al the data read until the numberBytesRead
+		_, err = file.WriteAt(fileBuffer[:numberBytesRead], int64(currentByte))
 
 		if err == io.EOF {
 			fmt.Println(err)
@@ -90,7 +91,7 @@ func getDataFromClient(filePath string, dirPath string, clientConnection *net.Co
 		}
 
 		//If we read all data from the file sent we need to stop
-		if uint32(n) != bufferSize {
+		if uint32(numberBytesRead) != bufferSize {
 			break
 		}
 

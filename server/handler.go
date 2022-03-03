@@ -50,7 +50,7 @@ func closeTcpConn(clientConnection *net.Conn, tcpPool *TcpConnPool) error {
 func handleConnection(clientConnection *net.Conn, tcpPool *TcpConnPool) {
 	//Const to compare commands
 	const STOP string = "STOP"
-	const GET string = "get"
+	const STOPCL string = "st"
 	const SEND string = "send"
 	const SUBSCRIBE string = "subscribe"
 

@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"os"
 	"strings"
@@ -38,7 +39,7 @@ func sendDataToClient(filePath string, clientConnection *net.Conn, bufferSize ui
 }
 
 //getDataFromClient allows to get data sent from a client
-func getDataFromClient(filePath string, clientConnection *net.Conn, bufferSize uint32) {
+func getDataFromClient(filePath string, dirPath string, clientConnection *net.Conn, bufferSize uint32) {
 	//We need a current byte te read through the file
 	var currentByte uint32 = 0
 
@@ -48,7 +49,17 @@ func getDataFromClient(filePath string, clientConnection *net.Conn, bufferSize u
 	if err != nil {
 		//If the file couldn't be created then a error arise
 		fmt.Println("Error creating file")
-		return
+		if os.IsNotExist(err) {
+			//If the directory doesn't exist we need to create it.
+			err := os.Mkdir(strings.TrimSpace(dirPath), os.ModePerm)
+			if err != nil {
+				log.Fatal(err)
+			}
+			file, _ = os.Create(strings.TrimSpace(filePath))
+			fmt.Println("Created directory", dirPath)
+		} else {
+			log.Fatal(err)
+		}
 	}
 	defer file.Close()
 

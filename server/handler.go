@@ -54,12 +54,15 @@ func handleConnection(clientConnection *net.Conn, tcpPool *TcpConnPool) {
 	const SEND string = "send"
 	const SUBSCRIBE string = "subscribe"
 
-	//Const showing paths
-	const PATH_FILES_SERVER string = ".\\files_server\\"
-
 	const bufferSize uint32 = 1024
 
 	var remoteAddress string = (*clientConnection).RemoteAddr().String()
+
+	//Const showing paths
+	const PATH_FILES_SERVER string = ".\\files_server\\"
+	var PATH_CLIENT string = fmt.Sprintf("%s\\", remoteAddress)
+	PATH_CLIENT = strings.Replace(PATH_CLIENT, ".", "_", -1)
+	PATH_CLIENT = strings.Replace(PATH_CLIENT, ":", "_", -1)
 
 	fmt.Printf("Serving %s\n", remoteAddress)
 
@@ -73,12 +76,14 @@ func handleConnection(clientConnection *net.Conn, tcpPool *TcpConnPool) {
 
 			fmt.Println(err)
 
+			tcpPool.Mu.Lock()
+			defer tcpPool.Mu.Unlock()
+
 			//Erasing channels
 			errEraseChannel := eraseConnChannels(clientConnection)
 			if errEraseChannel != nil {
 				log.Fatal(errEraseChannel)
 			}
-
 			//Closing connection
 			errEraseConnPool := closeTcpConn(clientConnection, tcpPool)
 			if errEraseConnPool != nil {
@@ -93,6 +98,9 @@ func handleConnection(clientConnection *net.Conn, tcpPool *TcpConnPool) {
 
 		if command == STOP {
 			fmt.Printf("Closing connection with %s\n", remoteAddress)
+
+			tcpPool.Mu.Lock()
+			defer tcpPool.Mu.Unlock()
 
 			eraseConnChannels(clientConnection)
 			closeTcpConn(clientConnection, tcpPool)
@@ -110,11 +118,12 @@ func handleConnection(clientConnection *net.Conn, tcpPool *TcpConnPool) {
 
 			//Creating path to file
 			fileName := splitMessage[1]
-			filePath := PATH_FILES_SERVER + fileName
+			filePath := PATH_FILES_SERVER + PATH_CLIENT + fileName
+			dirPath := PATH_FILES_SERVER + PATH_CLIENT
 
 			channel := splitMessage[2]
 
-			getDataFromClient(filePath, clientConnection, bufferSize)
+			getDataFromClient(filePath, dirPath, clientConnection, bufferSize)
 
 			//We need to send all data to clients subscribed to a channel
 			//we look at each client in a channel and send data to this client

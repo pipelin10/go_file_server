@@ -157,6 +157,8 @@ func handleConnection(clientConnection *net.Conn, tcpPool *TcpConnPool) {
 
 			tcpPool.Mu.Unlock()
 
+		} else if command == STOPCL {
+
 		} else { //No valid command
 			fmt.Fprintf((*clientConnection), "Please specify a valid command\n")
 			fmt.Println(tcpPool.Connections)

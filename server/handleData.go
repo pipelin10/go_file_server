@@ -31,7 +31,7 @@ func sendDataToClient(filePath string, clientConnection *net.Conn, bufferSize ui
 
 		(*clientConnection).Write(fileBuffer[:numberBytesRead]) //We send to the client the package read
 		if err == io.EOF {
-			fmt.Fprintf((*clientConnection), "Error sending file\n")
+			fmt.Printf("Complete sending file to %s\n", (*clientConnection).RemoteAddr().String())
 			break
 		}
 	}
@@ -69,10 +69,15 @@ func getDataFromClient(filePath string, dirPath string, clientConnection *net.Co
 		fileBufferString := string(fileBuffer[:])
 
 		//If a error arise during buffer read then we break
-		if err == io.EOF || err != nil {
+		if err == io.EOF {
+			message := "Complete send file"
+			fmt.Println(message)
+			break
+		}
+
+		if err != nil {
 			message := "Error sending file"
 			fmt.Println(message)
-			fmt.Fprintln((*clientConnection), message)
 			break
 		}
 
@@ -92,6 +97,8 @@ func getDataFromClient(filePath string, dirPath string, clientConnection *net.Co
 
 		//If we read all data from the file sent we need to stop
 		if uint32(numberBytesRead) != bufferSize {
+			message := "Complete send file"
+			fmt.Println(message)
 			break
 		}
 

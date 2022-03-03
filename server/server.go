@@ -3,206 +3,42 @@ package main
 import (
 	"bufio"
 	"bytes"
-	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"log"
-	"math/rand"
 	"net"
-	"net/http"
 	"os"
 	"strings"
 	"sync"
-	"time"
 )
-
-const bufferSize = 1024
-const maxQueueLength = 10000
 
 var channels map[string][]net.Conn
 var connChannels map[string][]string
 
 type TcpConfig struct {
-	Host         string
-	Port         int
-	MaxIdleConns int
-	MaxOpenConn  int
+	Host        string
+	Port        int
+	MaxOpenConn int
 }
 
 type tcpConn struct {
-	id   string
-	pool *TcpConnPool
-	conn net.Conn
-}
-
-type connRequest struct {
-	connChan chan *tcpConn
-	errChan  chan error
+	Id   string
+	Pool *TcpConnPool
+	Conn net.Conn
 }
 
 type TcpConnPool struct {
-	host         string
-	port         int
-	mu           sync.Mutex
-	idleConns    map[string]*tcpConn
-	numOpen      int
-	maxOpenCount int
-	maxIdleCount int
-	requestChan  chan *connRequest
+	Host        string
+	Port        int
+	Mu          sync.Mutex
+	Connections []*tcpConn
+	NumOpen     int
+	MaxOpenConn int
 }
 
-func (p *TcpConnPool) put(c *tcpConn) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	if p.maxIdleCount > 0 && p.maxIdleCount > len(p.idleConns) {
-		p.idleConns[c.id] = c
-	} else {
-		c.conn.Close()
-		c.pool.numOpen--
-	}
-}
-
-func (p *TcpConnPool) get() (*tcpConn, error) {
-	p.mu.Lock()
-
-	numIdle := len(p.idleConns)
-	if numIdle > 0 {
-		for _, c := range p.idleConns {
-			delete(p.idleConns, c.id)
-			p.mu.Unlock()
-			return c, nil
-		}
-	}
-
-	if p.maxOpenCount > 0 && p.numOpen >= p.maxOpenCount {
-		req := &connRequest{
-			connChan: make(chan *tcpConn, 1),
-			errChan:  make(chan error, 1),
-		}
-
-		p.requestChan <- req
-
-		p.mu.Unlock()
-
-		select {
-		case tcpConn := <-req.connChan:
-			return tcpConn, nil
-		case err := <-req.errChan:
-			return nil, err
-		}
-	}
-
-	p.numOpen++
-	p.mu.Lock()
-
-	newTcPConn, err := p.openNewTcpConnection()
-	if err != nil {
-		p.mu.Lock()
-		p.numOpen--
-		p.mu.Unlock()
-		return nil, err
-	}
-
-	return newTcPConn, nil
-}
-
-func (p *TcpConnPool) openNewTcpConnection() (*tcpConn, error) {
-	addr := fmt.Sprintf("%s:%d", p.host, p.port)
-
-	c, err := net.Dial("tcp4", addr)
-	if err != nil {
-		return nil, err
-	}
-
-	return &tcpConn{
-		id:   fmt.Sprintf("%v", time.Now().UnixNano()),
-		conn: c,
-		pool: p,
-	}, nil
-}
-
-func (p *TcpConnPool) handleConnectionRequest() {
-	for req := range p.requestChan {
-		var (
-			requestDone = false
-			hasTimeOut  = false
-
-			timeoutChan = time.After(3 * time.Second)
-		)
-
-		for {
-			if requestDone || hasTimeOut {
-				break
-			}
-
-			select {
-			case <-timeoutChan:
-				hasTimeOut = true
-				req.errChan <- errors.New("connection request timeout")
-			default:
-				p.mu.Lock()
-
-				numIdle := len(p.idleConns)
-				if numIdle > 0 {
-					for _, c := range p.idleConns {
-						delete(p.idleConns, c.id)
-						p.mu.Unlock()
-						req.connChan <- c
-						requestDone = true
-						break
-					}
-				} else if p.maxOpenCount > 0 && p.numOpen < p.maxOpenCount {
-					p.numOpen++
-					p.mu.Unlock()
-
-					c, err := p.openNewTcpConnection()
-					if err != nil {
-						p.mu.Lock()
-						p.numOpen--
-						p.mu.Unlock()
-					} else {
-						req.connChan <- c
-						requestDone = true
-					}
-				} else {
-					p.mu.Unlock()
-				}
-			}
-		}
-	}
-
-}
-
-func helloHandler(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/hello" {
-		http.Error(w, "404 not found.", http.StatusNotFound)
-		return
-	}
-
-	if r.Method != "GET" {
-		http.Error(w, "Method is not supported.", http.StatusNotFound)
-		return
-	}
-
-	fmt.Fprintf(w, "Hello World!")
-}
-
-func formHandler(w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseForm(); err != nil {
-		fmt.Fprintf(w, "ParseForm() err: %v", err)
-		return
-	}
-	fmt.Fprintf(w, "POST request successful")
-	name := r.FormValue("name")
-	address := r.FormValue("address")
-
-	fmt.Fprintf(w, "Name = %s\n", name)
-	fmt.Fprintf(w, "Address = %s\n", address)
-}
-
-func send_data_to_client(filePath string, conn net.Conn) {
-	currentByte := 0
+func sendDataToClient(filePath string, conn net.Conn, bufferSize uint32) {
+	var currentByte uint32 = 0
 
 	fileBuffer := make([]byte, bufferSize)
 
@@ -228,9 +64,8 @@ func send_data_to_client(filePath string, conn net.Conn) {
 	file.Close()
 }
 
-func get_data_from_client(filePath string, conn net.Conn) {
-	const bufferSize = 1024
-	currentByte := 0
+func getDataFromClient(filePath string, conn net.Conn, bufferSize uint32) {
+	var currentByte uint32 = 0
 
 	fileBuffer := make([]byte, bufferSize)
 
@@ -268,7 +103,7 @@ func get_data_from_client(filePath string, conn net.Conn) {
 		fmt.Println("Adding buffer")
 		currentByte += bufferSize
 
-		if err == io.EOF || n != bufferSize {
+		if err == io.EOF || uint32(n) != bufferSize {
 			fmt.Println("Algarete!!!")
 			break
 		}
@@ -292,22 +127,13 @@ func eraseConnChannels(c net.Conn) {
 	}
 }
 
-func CreateTcpConnPool(cfg *TcpConfig) (*TcpConnPool, error) {
-	pool := &TcpConnPool{
-		host:         cfg.Host,
-		port:         cfg.Port,
-		idleConns:    make(map[string]*tcpConn),
-		requestChan:  make(chan *connRequest, maxQueueLength),
-		maxOpenCount: cfg.MaxOpenConn,
-		maxIdleCount: cfg.MaxIdleConns,
-	}
-
-	go pool.handleConnectionRequest()
-
-	return pool, nil
-}
-
 func handleConnection(c net.Conn) {
+	const STOP string = "STOP"
+	const GET string = "get"
+	const SEND string = "send"
+	const SUBSCRIBE string = "subscribe"
+	const bufferSize uint32 = 1024
+
 	fmt.Printf("Serving %s\n", c.RemoteAddr().String())
 	defer c.Close()
 	for {
@@ -320,28 +146,44 @@ func handleConnection(c net.Conn) {
 		splitMessage := strings.Split(string(netData), " ")
 		command := strings.TrimSpace(splitMessage[0])
 		fmt.Println(splitMessage)
-		if command == "STOP" {
+		if command == STOP {
 			fmt.Printf("Closing connection with %s\n", c.RemoteAddr().String())
 			eraseConnChannels(c)
 			break
-		} else if command == "get" {
-			filePath := ".\\files_to_send_server\\" + splitMessage[1]
-			send_data_to_client(filePath, c)
-		} else if command == "send" {
+		} else if command == GET {
+			if len(splitMessage) == 1 {
+				fmt.Fprintf(c, "Please specify a filename\n")
+				continue
+			}
 			fileName := splitMessage[1]
-			filePath := ".\\files_recieved_server\\" + fileName
+			filePath := ".\\files_to_send_server\\" + fileName
+			sendDataToClient(filePath, c, bufferSize)
+		} else if command == SEND {
+			if len(splitMessage) == 1 {
+				fmt.Fprintf(c, "Please specify a filename\n")
+				continue
+			} else if len(splitMessage) == 2 {
+				fmt.Fprintf(c, "Please specify a channel\n")
+				continue
+			}
+			fileName := splitMessage[1]
 			channel := splitMessage[2]
-			get_data_from_client(filePath, c)
+			filePath := ".\\files_recieved_server\\" + fileName
+			getDataFromClient(filePath, c, bufferSize)
 			fmt.Print(channel)
 			ipHostClientSending := c.RemoteAddr().String()
 			for _, conn := range channels[channel] {
 				ipHostCienteReceiving := conn.RemoteAddr().String()
 				if ipHostClientSending != ipHostCienteReceiving {
 					fmt.Fprintf(conn, "send %s\n", fileName)
-					send_data_to_client(filePath, conn)
+					sendDataToClient(filePath, conn, bufferSize)
 				}
 			}
-		} else if command == "subscribe" {
+		} else if command == SUBSCRIBE {
+			if len(splitMessage) == 1 {
+				fmt.Fprintf(c, "Please specify a channel\n")
+				continue
+			}
 			channel := splitMessage[1]
 			channels[channel] = append(channels[channel], c)
 			connChannels[c.RemoteAddr().String()] = append(connChannels[c.RemoteAddr().String()], channel)
@@ -353,60 +195,84 @@ func handleConnection(c net.Conn) {
 				fmt.Printf("\n")
 			}
 		} else {
-			fmt.Fprintf(c, "Please specify a command\n")
+			fmt.Fprintf(c, "Please specify a valid command\n")
 		}
 	}
 	c.Close()
+}
+
+func InitConfig() (*TcpConfig, error) {
+	PortConfig := flag.Int("port", 8080, "Listen port")
+	HostConfig := flag.String("host", "localhost", "Listen host")
+	MaxOpenConnConfig := flag.Int("open", 1000, "Max number of tcp connections")
+
+	flag.Parse()
+
+	config := TcpConfig{
+		Host:        *HostConfig,
+		Port:        *PortConfig,
+		MaxOpenConn: *MaxOpenConnConfig,
+	}
+
+	return &config, nil
+}
+
+func CreateTcpPoolConn(config *TcpConfig) (*TcpConnPool, error) {
+	pool := &TcpConnPool{
+		NumOpen:     0,
+		Port:        config.Port,
+		Host:        config.Host,
+		MaxOpenConn: config.MaxOpenConn,
+		Connections: make([]*tcpConn, 0),
+	}
+
+	return pool, nil
 }
 
 func main() {
 	channels = make(map[string][]net.Conn)
 	connChannels = make(map[string][]string)
 
-	cfg := &TcpConfig{
-		Host:         "localhost",
-		Port:         8080,
-		MaxOpenConn:  1000,
-		MaxIdleConns: 1000,
-	}
+	config, err := InitConfig()
 
-	pool, err := CreateTcpConnPool(cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
-	go pool.handleConnectionRequest()
-	// fileServer := http.FileServer(http.Dir("./static"))
-	// http.Handle("/", fileServer)
-	// http.HandleFunc("/hello", helloHandler)
-	// http.HandleFunc("/form", formHandler)
 
-	// fmt.Printf("Starting Sever at Port 8080")
-	// if err := http.ListenAndServe(":8080", nil); err != nil {
-	// 	log.Fatal(err)
-	// }
+	tcpPool, err := CreateTcpPoolConn(config)
 
-	arguments := os.Args
-	if len(arguments) == 1 {
-		fmt.Println("Please provide a PORT number!")
-		return
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	PORT := ":" + arguments[1]
-	l, err := net.Listen("tcp4", PORT)
+	fmt.Println(tcpPool)
+
+	address := fmt.Sprintf("%s:%d", tcpPool.Host, tcpPool.Port)
+
+	listener, err := net.Listen("tcp4", address)
+
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	defer l.Close()
-	rand.Seed(time.Now().Unix())
+	defer listener.Close()
 
 	for {
-		c, err := l.Accept()
+		connectionClient, err := listener.Accept()
+
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
-		defer c.Close()
-		go handleConnection(c)
+		defer connectionClient.Close()
+
+		if tcpPool.NumOpen >= tcpPool.MaxOpenConn {
+			fmt.Fprintf(connectionClient, "Can't establish a connection with server")
+			continue
+		}
+
+		tcpPool.NumOpen++
+
+		go handleConnection(connectionClient)
 	}
 }

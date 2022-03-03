@@ -267,11 +267,13 @@ func main() {
 		defer connectionClient.Close()
 
 		if tcpPool.NumOpen >= tcpPool.MaxOpenConn {
-			fmt.Fprintf(connectionClient, "Can't establish a connection with server")
+			fmt.Fprintf(connectionClient, "Can't establish a connection with server\n")
 			continue
 		}
 
+		tcpPool.Mu.Lock()
 		tcpPool.NumOpen++
+		tcpPool.Mu.Unlock()
 
 		go handleConnection(connectionClient)
 	}

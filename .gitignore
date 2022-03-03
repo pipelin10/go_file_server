@@ -15,6 +15,5 @@
 # vendor/
 files_to_send_client*/*
 files_recieved_client*/*
-!files_to_send/explicacion.md
 server/files_server/*
-run_clients.go
+!server/files_server/explicacion.md

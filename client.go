@@ -41,7 +41,6 @@ func getDataFromServer(filePath string, dirPath string, conn net.Conn) {
 		fmt.Println("Before reading")
 		n, err := conn.Read(fileBuffer)
 		fileBufferString := string(fileBuffer[:])
-		// fmt.Println("File Buffer String", fileBufferString)
 		if err == io.EOF || err != nil {
 			fmt.Println("Algarete!!!")
 			break

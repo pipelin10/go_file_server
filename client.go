@@ -13,7 +13,7 @@ import (
 
 var channelsSubscribed []string
 
-func get_data_from_server(filePath string, dirPath string, conn net.Conn) {
+func getDataFromServer(filePath string, dirPath string, conn net.Conn) {
 	const bufferSize = 1024
 	currentByte := 0
 
@@ -72,7 +72,7 @@ func get_data_from_server(filePath string, dirPath string, conn net.Conn) {
 	file.Close()
 }
 
-func send_data_to_server(filePath string, conn net.Conn) {
+func sendDataToServer(filePath string, conn net.Conn) {
 	const bufferSize = 1024
 	currentByte := 0
 	fileBuffer := make([]byte, bufferSize)
@@ -99,7 +99,7 @@ func send_data_to_server(filePath string, conn net.Conn) {
 	file.Close()
 }
 
-func exist_channel(channel string, arrayChannels []string) bool {
+func existChannel(channel string, arrayChannels []string) bool {
 	for _, channelArray := range arrayChannels {
 		if channelArray == channel {
 			return true
@@ -109,30 +109,40 @@ func exist_channel(channel string, arrayChannels []string) bool {
 }
 
 func handleDataRecieved(conn net.Conn) {
+	const SEND string = "send"
+
 	fmt.Printf("Listen to data from %s\n", conn.RemoteAddr().String())
 	for {
 		netData, err := bufio.NewReader(conn).ReadString('\n')
 		if err != nil {
+			if len(netData) != 0 {
+				fmt.Println(netData)
+			}
 			log.Fatal(err)
 		}
 		fmt.Print("Recieving Data\n")
 		fmt.Print(netData)
 		splitMessage := strings.Split(string(netData), " ")
 		command := strings.TrimSpace(splitMessage[0])
-		if command == "send" {
+		if command == SEND {
 			fileName := splitMessage[1]
 			localAddress := conn.LocalAddr().String()
 			localAddress = strings.Replace(localAddress, ".", "_", -1)
 			localAddress = strings.Replace(localAddress, ":", "_", -1)
 			filePath := ".\\files_recieved_client" + localAddress + "\\" + fileName
 			dirPath := ".\\files_recieved_client" + localAddress + "\\"
-			get_data_from_server(filePath, dirPath, conn)
+			getDataFromServer(filePath, dirPath, conn)
 		}
 		fmt.Print("\n")
 	}
 }
 
-func run_client() {
+func main() {
+	const STOP string = "st"
+	const GET string = "get"
+	const SEND string = "send"
+	const SUBSCRIBE string = "subscribe"
+
 	arguments := os.Args
 	if len(arguments) == 1 {
 		fmt.Println("Please provide a host:port")
@@ -152,26 +162,44 @@ func run_client() {
 	for {
 		reader := bufio.NewReader(os.Stdin)
 		text, _ := reader.ReadString('\n')
-		text_split := strings.Split(strings.TrimSpace(string(text)), " ")
-		command := strings.TrimSpace(string(text_split[0]))
-		if command == "st" {
+		textSplit := strings.Split(strings.TrimSpace(string(text)), " ")
+		command := strings.TrimSpace(string(textSplit[0]))
+		if command == STOP {
 			fmt.Fprintf(c, text+"\n")
-			fmt.Println("TCP Cliente exting")
+			fmt.Println("TCP Cliente exit")
 			c.Close()
 			return
-		} else if command == "get" {
+		} else if command == GET {
 			fmt.Fprintf(c, text+"\n")
-			filePath := ".\\files_recieved_client\\" + text_split[1]
+			if len(textSplit) == 1 {
+				fmt.Printf("Please specify a filename\n")
+				continue
+			}
+			fileName := textSplit[1]
+			filePath := ".\\files_recieved_client\\" + fileName
 			dirPath := ".\\files_recieved_client\\"
-			get_data_from_server(filePath, dirPath, c)
-		} else if command == "send" {
+			getDataFromServer(filePath, dirPath, c)
+		} else if command == SEND {
 			fmt.Fprintf(c, text+"\n")
-			filePath := ".\\files_to_send_client\\" + text_split[1]
-			send_data_to_server(filePath, c)
-		} else if command == "subscribe" {
-			channel := text_split[1]
-			fmt.Printf(channel)
-			if !exist_channel(channel, channelsSubscribed) {
+			if len(textSplit) == 1 {
+				fmt.Printf("Please specify a filename\n")
+				continue
+			}
+			if len(textSplit) == 2 {
+				fmt.Printf("Please specify a channel\n")
+				continue
+			}
+			fileName := textSplit[1]
+			filePath := ".\\files_to_send_client\\" + fileName
+			sendDataToServer(filePath, c)
+		} else if command == SUBSCRIBE {
+			if len(textSplit) == 1 {
+				fmt.Printf("Please specify a channel\n")
+				continue
+			}
+			channel := textSplit[1]
+			fmt.Print(channel)
+			if !existChannel(channel, channelsSubscribed) {
 				fmt.Fprintf(c, text+"\n")
 				channelsSubscribed = append(channelsSubscribed, channel)
 				fmt.Print(channelsSubscribed)
@@ -180,7 +208,7 @@ func run_client() {
 				fmt.Printf("Already subscribed to channel %s\n", channel)
 			}
 		} else {
-			fmt.Fprintf(c, text)
+			fmt.Fprint(c, text)
 		}
 	}
 }

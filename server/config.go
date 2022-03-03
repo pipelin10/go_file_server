@@ -7,18 +7,21 @@ import (
 	"sync"
 )
 
+//Struct that contains the config for the tcpPool
 type TcpConfig struct {
 	Host        string
 	Port        int
 	MaxOpenConn int
 }
 
+//Struct that provides a tcp connection interface
 type TcpConn struct {
 	Id   string
 	Pool *TcpConnPool
 	Conn net.Conn
 }
 
+//Struct that contatins all data related to the tcp pool
 type TcpConnPool struct {
 	Host        string
 	Port        int
@@ -28,6 +31,7 @@ type TcpConnPool struct {
 	MaxOpenConn int
 }
 
+//InitConfig allows to load config for tcp pool
 func InitConfig() (*TcpConfig, error) {
 	PortConfig := flag.Int("port", 8080, "Listen port")
 	HostConfig := flag.String("host", "localhost", "Listen host")
@@ -44,6 +48,7 @@ func InitConfig() (*TcpConfig, error) {
 	return &config, nil
 }
 
+//Allows to create the tcp pool
 func CreateTcpPoolConn(config *TcpConfig) (*TcpConnPool, error) {
 	pool := &TcpConnPool{
 		NumOpen:     0,
@@ -56,6 +61,7 @@ func CreateTcpPoolConn(config *TcpConfig) (*TcpConnPool, error) {
 	return pool, nil
 }
 
+//Function that allows to initialize the pool connection
 func InitPool() (*TcpConnPool, error) {
 	config, err := InitConfig()
 

@@ -19,6 +19,7 @@ func sendDataToClient(filePath string, clientConnection *net.Conn, bufferSize ui
 	file, err := os.Open(strings.TrimSpace(filePath))
 	if err != nil {
 		fmt.Fprintf((*clientConnection), "No se encuentra un archivo en la ruta")
+		fmt.Println("No se encuentra un archivo en la ruta")
 		return
 	}
 	defer file.Close()
@@ -39,7 +40,7 @@ func sendDataToClient(filePath string, clientConnection *net.Conn, bufferSize ui
 }
 
 //getDataFromClient allows to get data sent from a client
-func getDataFromClient(filePath string, dirPath string, clientConnection *net.Conn, bufferSize uint32) {
+func getDataFromClient(filePath string, dirPath string, clientConnection *net.Conn, bufferSize uint32) string {
 	//We need a current byte te read through the file
 	var currentByte uint32 = 0
 
@@ -66,7 +67,7 @@ func getDataFromClient(filePath string, dirPath string, clientConnection *net.Co
 	for {
 		//We read a package of size equals to bufferSize
 		numberBytesRead, err := (*clientConnection).Read(fileBuffer)
-		fileBufferString := string(fileBuffer[:])
+		fileBufferString := string(fileBuffer[:numberBytesRead])
 
 		//If a error arise during buffer read then we break
 		if err == io.EOF {
@@ -83,8 +84,16 @@ func getDataFromClient(filePath string, dirPath string, clientConnection *net.Co
 
 		//If the file doesn't exist we arise an error
 		if fileBufferString == "No se encuentra un archivo en la ruta" {
-			fmt.Println("Error al cargar el archivo")
-			return
+			fmt.Println("Error loading file")
+			file.Close()
+
+			//If the file doesn't exist we erase the file created
+			err := os.Remove(filePath)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			return fileBufferString
 		}
 
 		//We write in the file al the data read until the numberBytesRead
@@ -105,4 +114,6 @@ func getDataFromClient(filePath string, dirPath string, clientConnection *net.Co
 		currentByte += bufferSize //We move the current byte
 	}
 	file.Close()
+
+	return ""
 }

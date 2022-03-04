@@ -123,7 +123,12 @@ func handleConnection(clientConnection *net.Conn, tcpPool *TcpConnPool) {
 
 			channel := splitMessage[2]
 
-			getDataFromClient(filePath, dirPath, clientConnection, bufferSize)
+			messageResult := getDataFromClient(filePath, dirPath, clientConnection, bufferSize)
+
+			if messageResult == "No se encuentra un archivo en la ruta" {
+				fmt.Println("Error getting file")
+				continue
+			}
 
 			//We need to send all data to clients subscribed to a channel
 			//we look at each client in a channel and send data to this client

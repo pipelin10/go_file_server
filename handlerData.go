@@ -22,7 +22,7 @@ func getDataFromServer(filePath string, dirPath string, serverConnection *net.Co
 		fmt.Println("Error creating file")
 		if os.IsNotExist(err) {
 			//If the directory doesn't exist we need to create it.
-			err := os.Mkdir(strings.TrimSpace(dirPath), os.ModePerm)
+			err := os.Mkdir(strings.TrimSpace(dirPath), 0777)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -37,7 +37,7 @@ func getDataFromServer(filePath string, dirPath string, serverConnection *net.Co
 	for {
 		//We read a package of size equals to bufferSize
 		numberBytesRead, err := (*serverConnection).Read(fileBuffer)
-		fileBufferString := string(fileBuffer[:])
+		fileBufferString := string(fileBuffer[:numberBytesRead])
 
 		//If a error arise during buffer read then we break
 		if err == io.EOF {
@@ -54,7 +54,15 @@ func getDataFromServer(filePath string, dirPath string, serverConnection *net.Co
 
 		//If the file doesn't exist we arise an error
 		if fileBufferString == "No se encuentra un archivo en la ruta" {
-			fmt.Println("Error al cargar el archivo")
+			fmt.Println("Error loading file")
+			file.Close()
+
+			//If the file doesn't exist we erase the file created
+			err := os.Remove(filePath)
+			if err != nil {
+				log.Fatal(err)
+			}
+
 			return
 		}
 

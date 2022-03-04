@@ -26,7 +26,7 @@ func handleDataRecieved(serverConnection *net.Conn) {
 	const send string = "send"
 
 	//Const to paths
-	const dirClient string = ".\\files_recieved_client"
+	const dirClient string = ".\\filesRecieved"
 
 	var remoteAddress string = (*serverConnection).RemoteAddr().String()
 
@@ -53,8 +53,8 @@ func handleDataRecieved(serverConnection *net.Conn) {
 
 			//We setup a localaddress to create a folder with the data recieved from the server
 			localAddress := (*serverConnection).LocalAddr().String()
-			localAddress = strings.Replace(localAddress, ".", "_", -1)
-			localAddress = strings.Replace(localAddress, ":", "_", -1)
+			localAddress = strings.Replace(localAddress, ".", "", -1)
+			localAddress = strings.Replace(localAddress, ":", "", -1)
 
 			//We setup the filename and the dirpath needed to read the file and create the folder
 			//if it doesn't exist

@@ -23,10 +23,10 @@ func existChannel(channel string, arrayChannels []string) bool {
 //handleConnection allows to manage the data recieved from the server
 func handleDataRecieved(serverConnection *net.Conn) {
 	//Const to compare commands
-	const SEND string = "send"
+	const send string = "send"
 
 	//Const to paths
-	const DIRCLIENT string = ".\\files_recieved_client"
+	const dirClient string = ".\\files_recieved_client"
 
 	var remoteAddress string = (*serverConnection).RemoteAddr().String()
 
@@ -49,7 +49,7 @@ func handleDataRecieved(serverConnection *net.Conn) {
 		splitMessage := strings.Split(string(serverMessage), " ")
 		command := strings.TrimSpace(splitMessage[0])
 
-		if command == SEND {
+		if command == send {
 
 			//We setup a localaddress to create a folder with the data recieved from the server
 			localAddress := (*serverConnection).LocalAddr().String()
@@ -59,8 +59,8 @@ func handleDataRecieved(serverConnection *net.Conn) {
 			//We setup the filename and the dirpath needed to read the file and create the folder
 			//if it doesn't exist
 			fileName := splitMessage[1]
-			filePath := DIRCLIENT + localAddress + "\\" + fileName
-			dirPath := DIRCLIENT + localAddress + "\\"
+			filePath := dirClient + localAddress + "\\" + fileName
+			dirPath := dirClient + localAddress + "\\"
 			getDataFromServer(filePath, dirPath, serverConnection)
 		}
 		fmt.Printf("\n")
@@ -69,10 +69,9 @@ func handleDataRecieved(serverConnection *net.Conn) {
 
 func handleMessages(serverConnection *net.Conn) {
 	//Const to compare commands
-	const STOP string = "st"
-	const GET string = "get"
-	const SEND string = "send"
-	const SUBSCRIBE string = "subscribe"
+	const stop string = "st"
+	const send string = "send"
+	const subscribe string = "subscribe"
 
 	for {
 		message, err := bufio.NewReader(os.Stdin).ReadString('\n') //Read message from the client
@@ -84,7 +83,7 @@ func handleMessages(serverConnection *net.Conn) {
 		messageSplit := strings.Split(strings.TrimSpace(string(message)), " ")
 		command := strings.TrimSpace(string(messageSplit[0]))
 
-		if command == STOP { //Stop connection with server
+		if command == stop { //Stop connection with server
 
 			fmt.Fprintf((*serverConnection), message+"\n")
 			fmt.Println("TCP Cliente exit")
@@ -93,7 +92,7 @@ func handleMessages(serverConnection *net.Conn) {
 
 			return
 
-		} else if command == SEND {
+		} else if command == send {
 
 			fmt.Fprintf((*serverConnection), message+"\n")
 
@@ -113,7 +112,7 @@ func handleMessages(serverConnection *net.Conn) {
 
 			sendDataToServer(filePath, serverConnection)
 
-		} else if command == SUBSCRIBE {
+		} else if command == subscribe {
 
 			//Check if channel was not specified
 			if len(messageSplit) == 1 {

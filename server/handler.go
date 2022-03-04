@@ -49,20 +49,20 @@ func closeTcpConn(clientConnection *net.Conn, tcpPool *TcpConnPool) error {
 //handleConnection allows to manage the messages recieved from the client
 func handleConnection(clientConnection *net.Conn, tcpPool *TcpConnPool) {
 	//Const to compare commands
-	const STOP string = "STOP"
-	const STOPCL string = "st"
-	const SEND string = "send"
-	const SUBSCRIBE string = "subscribe"
+	const stop string = "stop"
+	const stopCl string = "st"
+	const send string = "send"
+	const subscribe string = "subscribe"
 
 	const bufferSize uint32 = 1024
 
 	var remoteAddress string = (*clientConnection).RemoteAddr().String()
 
 	//Const showing paths
-	const PATH_FILES_SERVER string = ".\\files_server\\"
-	var PATH_CLIENT string = fmt.Sprintf("%s\\", remoteAddress)
-	PATH_CLIENT = strings.Replace(PATH_CLIENT, ".", "_", -1)
-	PATH_CLIENT = strings.Replace(PATH_CLIENT, ":", "_", -1)
+	const pathFilesServer string = ".\\files_server\\"
+	var pathClient string = fmt.Sprintf("%s\\", remoteAddress)
+	pathClient = strings.Replace(pathClient, ".", "_", -1)
+	pathClient = strings.Replace(pathClient, ":", "_", -1)
 
 	fmt.Printf("Serving %s\n", remoteAddress)
 
@@ -96,7 +96,7 @@ func handleConnection(clientConnection *net.Conn, tcpPool *TcpConnPool) {
 		splitMessage := strings.Split(string(serverMessage), " ")
 		command := strings.TrimSpace(splitMessage[0])
 
-		if command == STOP {
+		if command == stop || command == stopCl {
 			fmt.Printf("Closing connection with %s\n", remoteAddress)
 
 			tcpPool.Mu.Lock()
@@ -106,7 +106,7 @@ func handleConnection(clientConnection *net.Conn, tcpPool *TcpConnPool) {
 			closeTcpConn(clientConnection, tcpPool)
 
 			break
-		} else if command == SEND {
+		} else if command == send {
 			//Check if filename or channel were not specify
 			if len(splitMessage) == 1 {
 				fmt.Fprintf((*clientConnection), "Please specify a filename\n")
@@ -118,8 +118,8 @@ func handleConnection(clientConnection *net.Conn, tcpPool *TcpConnPool) {
 
 			//Creating path to file
 			fileName := splitMessage[1]
-			filePath := PATH_FILES_SERVER + PATH_CLIENT + fileName
-			dirPath := PATH_FILES_SERVER + PATH_CLIENT
+			filePath := pathFilesServer + pathClient + fileName
+			dirPath := pathFilesServer + pathClient
 
 			channel := splitMessage[2]
 
@@ -140,7 +140,7 @@ func handleConnection(clientConnection *net.Conn, tcpPool *TcpConnPool) {
 
 			}
 
-		} else if command == SUBSCRIBE {
+		} else if command == subscribe {
 			//Check if channel was not specify
 			if len(splitMessage) == 1 {
 				fmt.Fprintf((*clientConnection), "Please specify a channel\n")
@@ -156,8 +156,6 @@ func handleConnection(clientConnection *net.Conn, tcpPool *TcpConnPool) {
 			connChannels[remoteAddress] = append(connChannels[remoteAddress], channel)
 
 			tcpPool.Mu.Unlock()
-
-		} else if command == STOPCL {
 
 		} else { //No valid command
 			fmt.Fprintf((*clientConnection), "Please specify a valid command\n")

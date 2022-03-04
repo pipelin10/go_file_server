@@ -70,13 +70,13 @@ func getDataFromClient(filePath string, dirPath string, clientConnection *net.Co
 
 		//If a error arise during buffer read then we break
 		if err == io.EOF {
-			message := "Complete send file"
+			message := "Complete get file"
 			fmt.Println(message)
 			break
 		}
 
 		if err != nil {
-			message := "Error sending file"
+			message := "Error getting file"
 			fmt.Println(message)
 			break
 		}
@@ -97,7 +97,7 @@ func getDataFromClient(filePath string, dirPath string, clientConnection *net.Co
 
 		//If we read all data from the file sent we need to stop
 		if uint32(numberBytesRead) != bufferSize {
-			message := "Complete send file"
+			message := "Complete get file"
 			fmt.Println(message)
 			break
 		}
